@@ -7,65 +7,11 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-
-#define PORT 8053
-
-#define DNS_PACKET_SIZE 512
-
-#define QR_QUERY 0
-#define QR_RESPONSE 1
-
-#define OPCODE_QUERY 0
-#define OPCODE_IQUERY 1
-#define OPCODE_STATUS 2
-
-#define AA_NONAUTHORITY 0
-#define AA_AUTHORITY 1
+#include "dnsproxyserver.h"
 
 char upstreamServer[16];
 char blackList[256];
 char code[16];
-
-typedef struct {
-    u_int16_t id;
-
-    u_int16_t qr :1;
-    u_int16_t opcode :4;
-    u_int16_t aa :1;
-    u_int16_t tc :1;
-    u_int16_t rd :1;
-    u_int16_t ra :1;
-    u_int16_t z :3;
-    u_int16_t rcode :4;
-
-    u_int16_t qdcount;
-    u_int16_t ancount;
-    u_int16_t nscount;
-    u_int16_t arcount;
-} DNS_HEADER;
-
-typedef struct {
-    char* qname;
-    unsigned short qtype;
-    unsigned short qclass;
-} QUESTION;
-
-typedef struct {
-    char* name;
-    u_int16_t type;
-    u_int16_t class;
-    u_int32_t ttl;
-    u_int16_t rdlength;
-    char* rdata;
-} RESPONSE;
-
-typedef struct{
-    DNS_HEADER header;
-    QUESTION question;
-    char* data;
-    u_int16_t data_size;
-} DNS_PACKET;
-
 
 int main(void){
     
@@ -87,6 +33,8 @@ int main(void){
     int listenfd = 0, conn = 0;
 
     int data_size;
+
+    DNS_PACKET* packet;
 
     if((listenfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0){
         perror("Error with server socket creation");
@@ -110,7 +58,8 @@ int main(void){
             exit(EXIT_FAILURE);
         }
 
-        write(1, buf, DNS_PACKET_SIZE+4);
+        packet = malloc(sizeof(DNS_PACKET));
+        char** domains = dns_request_parser(packet, buf, data_size);
 
     }
 
@@ -121,6 +70,5 @@ int main(void){
 
 /*
     TODO: 
-    Реализовать извлечение информации из получаемых сервером транзитных пакетов
     Реализовать фильтрацию по черному списку и возврат кода
 */
