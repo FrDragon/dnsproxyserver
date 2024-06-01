@@ -14,9 +14,13 @@
 #define AA_NONAUTHORITY 0
 #define AA_AUTHORITY 1
 
-char upstreamServer[16];
+/*char upstreamServer[16];
 char blackList[256];
-char code[16];
+char code[16];*/
+
+char upstreamServer[] = "8.8.8.8";
+char blackList[] = "vk.com yandex.ru";
+char code[] = "not found";
 
 typedef struct {
     u_int16_t id;
