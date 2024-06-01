@@ -9,10 +9,6 @@
 #include <sys/socket.h>
 #include "dnsproxyserver.h"
 
-char upstreamServer[16];
-char blackList[256];
-char code[16];
-
 int main(void){
     
     FILE *fp = fopen("settings.conf", "r");
@@ -27,9 +23,20 @@ int main(void){
         exit(EXIT_FAILURE);
     }
 
-    struct sockaddr_in serv_addr, client_addr;
+    char banned_domains[256];
+    char* token = strtok(blackList, ' ,');
+
+    for(int t = 0; t < 256; t++){
+        if(*token == NULL){
+            break;
+        }
+        banned_domains[t] = *token;
+        token = strtok(NULL, ' ,');
+    }
+
+    struct sockaddr_in serv_addr, client_addr, upstream_server_addr;
     char buf[DNS_PACKET_SIZE+4];
-    socklen_t client_len;
+    socklen_t client_len = sizeof(client_addr), upstream_len = sizeof(upstream_server_addr);
     int listenfd = 0, conn = 0;
 
     int data_size;
@@ -41,11 +48,18 @@ int main(void){
         exit(EXIT_FAILURE);
     }
     memset(&serv_addr, '0', sizeof(serv_addr));
+    memset(&client_addr, '0', sizeof(client_addr));
+    memset(&upstream_server_addr, '0', sizeof(upstream_server_addr));
     memset(buf, '0', sizeof(buf));
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(PORT);
+
+    upstream_server_addr.sin_family = AF_INET;
+    inet_aton(upstreamServer, &upstream_server_addr.sin_addr);
+    upstream_server_addr.sin_port = htons(PORT);
+
 
     if(bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0){
         perror("Error with server socket binding");
@@ -60,15 +74,20 @@ int main(void){
 
         packet = malloc(sizeof(DNS_PACKET));
         char** domains = dns_request_parser(packet, buf, data_size);
+        token = strtok(blackList, ' ,');
+        for(int t = 0; t < 65536; t++){
+            for(int i = 0; i < 256; i++){
+                if(!strcmp(domains[t], banned_domains[i])){
+                    send_code(packet, listenfd, client_addr, client_len);
+                    exit(1);
+                }
+            }
+        }
 
+        sendto(listenfd, buf, DNS_PACKET_SIZE + 4, 0, (struct sockaddr*)&upstream_server_addr, &upstream_len);
+        recvfrom(listenfd, buf, DNS_PACKET_SIZE + 4, 0, (struct sockaddr*)&upstream_server_addr, &upstream_len);
+        sendto(listenfd, buf, DNS_PACKET_SIZE + 4, 0, (struct sockaddr*)&client_addr, &client_len);
     }
 
-    printf("%s%s%s", upstreamServer, blackList, code);
     close(listenfd);
 }
-
-
-/*
-    TODO: 
-    Реализовать фильтрацию по черному списку и возврат кода
-*/

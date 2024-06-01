@@ -9,9 +9,34 @@
 #include <sys/socket.h>
 #include "dnsproxyserver.h"
 
+void send_code(DNS_PACKET *packet_in, int listenfd, struct sockaddr_in client_addr, socklen_t client_len){
+    char buf[256];
+    int buf_len = 0;
+
+    DNS_PACKET *pack = malloc(sizeof(DNS_PACKET));
+    pack->header.id = 2048;
+    if(!strcmp(code, "not found")){
+        pack->header.rcode = 3;
+    } else if(!strcmp(code, "refused")){
+        pack->header.rcode = 5;
+    } else {
+        memcpy(buf, &pack->header, 12);
+        buf_len = 12;
+        memcpy(buf + buf_len, &packet_in->question, sizeof(QUESTION));
+        buf_len += sizeof(QUESTION);
+        memcpy(buf+buf_len, code, sizeof(16));
+        buf_len += 16;
+        sendto(listenfd, buf, buf_len, 0, (struct sockaddr*) &client_addr, client_len);
+        return;
+    }
+    memcpy(buf, &pack->header, 12);
+    sendto(listenfd, buf, buf_len, 0, (struct sockaddr*) &client_addr, client_len);
+    return;
+}
+
 char** dns_request_parser(DNS_PACKET* packet, void* data, u_int16_t size){
     int i = 0;
-    char domains[65536][253];
+    static char domains[65536][253];
 
     dns_header_parser(&packet->header, data);
     packet->data = malloc(size - 12);

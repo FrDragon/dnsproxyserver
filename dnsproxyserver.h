@@ -1,6 +1,6 @@
 #include <sys/types.h>
 
-#define PORT 8053
+#define PORT 53
 
 #define DNS_PACKET_SIZE 512
 
@@ -13,6 +13,10 @@
 
 #define AA_NONAUTHORITY 0
 #define AA_AUTHORITY 1
+
+char upstreamServer[16];
+char blackList[256];
+char code[16];
 
 typedef struct {
     u_int16_t id;
@@ -57,3 +61,4 @@ typedef struct{
 char** dns_request_parser(DNS_PACKET* packet, void* data, u_int16_t size);
 int dns_header_parser(DNS_HEADER* header, void* data);
 char* dns_question_parse(DNS_PACKET* packet);
+void send_code(DNS_PACKET *packet_in, int listenfd, struct sockaddr_in client_addr, socklen_t client_len);
