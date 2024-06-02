@@ -9,10 +9,8 @@
 #include <sys/socket.h>
 #include "dnsproxyserver.h"
 
-int main(void){
-    
+int main(int argc, char**argv){
     FILE *fp;
-    char* token;
 
     if(!(fp = fopen("settings.conf", "r"))) {
     	printf("Error with settings file opening"); 
@@ -29,6 +27,7 @@ int main(void){
         getline(&upstreamServer, &upstreamServer_len, fp);
         getline(&blackList, &blackList_len, fp);
         getline(&code, &code_len, fp);
+        close(fp);
     } else {
         perror("Error with config file");
         exit(EXIT_FAILURE);
@@ -37,7 +36,7 @@ int main(void){
     struct sockaddr_in serv_addr, client_addr, upstream_server_addr;
     char buf[DNS_PACKET_SIZE + 4];
     socklen_t client_len = sizeof(client_addr), upstream_len = sizeof(upstream_server_addr);
-    int listenfd = 0, conn = 0;
+    int listenfd = 0;
 
     int data_size;
 
@@ -58,7 +57,7 @@ int main(void){
 
     upstream_server_addr.sin_family = AF_INET;
     inet_aton(upstreamServer, &upstream_server_addr.sin_addr);
-    upstream_server_addr.sin_port = htons(PORT);
+    upstream_server_addr.sin_port = htons(53);
 
 
     if(bind(listenfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0){
@@ -73,18 +72,10 @@ int main(void){
         }
 
         packet = malloc(sizeof(DNS_PACKET));
-        char** domains = dns_request_parser(packet, buf, data_size);
-        int i = 0;
-
-        do{
-            token = strtok(blackList, " ,");
-            for(int i = 0; i < 65536; i++){
-                if(!strcmp(domains[i], token)){
-                send_code(packet, listenfd, client_addr, client_len, code);
-                exit(EXIT_FAILURE);
-            }
-            }
-        } while((token = strtok(NULL, " ,"))!= NULL);
+        if(dns_request_parser(packet, buf, data_size, blackList)){
+            send_code(packet, listenfd, client_addr, client_len, code);
+            continue;
+        }
 
         sendto(listenfd, buf, DNS_PACKET_SIZE + 4, 0, (struct sockaddr*)&upstream_server_addr, upstream_len);
         recvfrom(listenfd, buf, sizeof(buf), 0, (struct sockaddr*)&upstream_server_addr, &upstream_len);
@@ -121,23 +112,30 @@ void send_code(DNS_PACKET *packet_in, int listenfd, struct sockaddr_in client_ad
     return;
 }
 
-char** dns_request_parser(DNS_PACKET* packet, void* data, u_int16_t size){
+int dns_request_parser(DNS_PACKET* packet, void* data, u_int16_t size, char* blackList){
     int i = 0;
-    static char domains[65536][253];
 
     dns_header_parser(&packet->header, data);
     packet->data = malloc(size - 12);
     memcpy(packet->data, data + 12, size - 12);
     packet->data_size = size - 12;
 
-    while(i < packet->header.qdcount){
-        strcpy(domains[i], dns_question_parse(packet));
-        i++;
-    }
+    char* token;
+
+    do{
+        token = strtok(blackList, " ,");
+        while(i < packet->header.qdcount){
+            if(!strcmp(token, dns_question_parse(packet))){
+                return 1;
+            };
+            i++;
+        }
+        
+    } while((token = strtok(NULL, " ,"))!= NULL);
 
     free(packet->data);
 
-    return domains;
+    return 0;
 }
 
 

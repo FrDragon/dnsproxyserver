@@ -1,6 +1,6 @@
 #include <sys/types.h>
 
-#define PORT 8053
+#define PORT 53
 
 #define DNS_PACKET_SIZE 512
 
@@ -54,7 +54,7 @@ typedef struct{
     u_int16_t data_size;
 } DNS_PACKET;
 
-char** dns_request_parser(DNS_PACKET* packet, void* data, u_int16_t size);
+int dns_request_parser(DNS_PACKET* packet, void* data, u_int16_t size, char* blackList);
 int dns_header_parser(DNS_HEADER* header, void* data);
 char* dns_question_parse(DNS_PACKET* packet);
 void send_code(DNS_PACKET *packet_in, int listenfd, struct sockaddr_in client_addr, socklen_t client_len, char* code);
